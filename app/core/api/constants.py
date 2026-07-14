@@ -1,0 +1,11 @@
+CATEGORY_LIST = [
+    "TOURISM",
+    "LEISUR",
+    "CULTURAL_FACILITY",
+    "SHOPPING",
+    "ACCOMMODATION",
+    "TRAVEL_COURSE",
+    "RESTAURANT",
+    "FESTIVAL",
+    "DEFAULT"
+]

@@ -1,11 +1,9 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.schemas.category import CategoryCode
-
 
 class PostCreateRequest(BaseModel):
-    category: CategoryCode
+    category: str = "DEFAULT"
     title: str = Field(min_length=1, max_length=100,)
     content: str = Field(min_length=1, max_length=5000,)
     password: str = Field(min_length=2, max_length=20,)

@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.model.post import Post
 from app.schemas.post import PostCreateRequest
+from app.core.api.constants import CATEGORY_LIST
+from app.core.api.exceptions import InvalidCategoryException
 
 
 class PostController:
@@ -12,8 +14,11 @@ class PostController:
         db: Session,
         request: PostCreateRequest,
     ) -> Post:
+        if request.category not in CATEGORY_LIST:
+            raise InvalidCategoryException()
+
         new_post = Post(
-            category=request.category.value,
+            category=request.category,
             title=request.title,
             content=request.content,
             password=request.password,

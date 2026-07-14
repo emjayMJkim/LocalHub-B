@@ -9,6 +9,7 @@ from app.schemas.post import (
     PostCreateRequest,
     PostResponse,
 )
+from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE
 
 
 router = APIRouter(
@@ -22,6 +23,7 @@ router = APIRouter(
     response_model=ApiResponse[PostCreateResponse],
     status_code=status.HTTP_201_CREATED,
     summary="게시글 작성",
+    responses=INVALID_CATEGORY_RESPONSE
 )
 def create_post(
     request: PostCreateRequest,
