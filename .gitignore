@@ -1,12 +1,13 @@
-# python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
+# virtual env
 .venv/
+
+# python cache
+__pycache__/
+
+# sqlite
+*.db
+
+# env
 .env
 
 # etc
