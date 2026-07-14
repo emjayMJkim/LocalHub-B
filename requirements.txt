@@ -1,7 +1,19 @@
-alembic
+# Web Framework & Server
 fastapi
-uvicorn[standard]
-sqlalchemy
+uvicorn[standard]>=0.29.
 pydantic
 pydantic-settings
-python-dotenv
+
+# Database
+SQLAlchemy
+alembic
+
+# env
+python-dotenv>=1.0.0
+
+# Data Processing & Evaluation
+pandas
+requests
+numpy
+
+# LLM & AI
