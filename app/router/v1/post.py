@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS, FORBIDDEN_PASSWORD, MUST_CHECK_CONTENT
 from app.core.util.constants import get_category_name
-from app.core.util.content_preview import create_content_preview
+from app.core.util.content_view import create_content_preview
 from app.controller.post import PostController
 from app.database.session import get_db
 from app.schemas.base import ApiResponse
