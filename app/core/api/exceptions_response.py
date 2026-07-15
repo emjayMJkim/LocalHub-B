@@ -1,18 +1,3 @@
-NOT_FOUND_POSTS = {
-    404 : {
-        "description": "게시글 없음",
-        "content": {
-            "application/json": {
-                "example": {
-                    "success": False,
-                    "data": {},
-                    "message": "게시글을 찾을 수 없습니다.",
-                }
-            }
-        },
-    }
-}
-
 INVALID_CATEGORY_RESPONSE = {
     400: {
         "description": "잘못된 카테고리",
@@ -28,6 +13,20 @@ INVALID_CATEGORY_RESPONSE = {
     }
 }
 
+NOT_FOUND_POSTS = {
+    404 : {
+        "description": "게시글 없음",
+        "content": {
+            "application/json": {
+                "example": {
+                    "success": False,
+                    "data": {},
+                    "message": "게시글을 찾을 수 없습니다.",
+                }
+            }
+        },
+    }
+}
 
 POST_CREATE_DB_ERROR_RESPONSE = {
     500: {

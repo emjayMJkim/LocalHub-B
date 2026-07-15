@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE
+from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS
 from app.core.api.constants import get_category_name
 from app.controller.post import PostController
 from app.database.session import get_db
 from app.schemas.base import ApiResponse
 from app.schemas.request.post_request import PostCreateRequest
-from app.schemas.response.post_response import PostCreateResponse, PostGetResponse, PostListItemResponse
-from app.schemas.common.post_common import PostResponse
+from app.schemas.response.post_response import PostDetailResponse, PostGetResponse
+from app.schemas.common.post_common import PostResponse, PostListItemResponse
 
 
 router = APIRouter(
@@ -19,7 +19,7 @@ router = APIRouter(
 
 @router.post(
         "",
-    response_model=ApiResponse[PostCreateResponse],
+    response_model=ApiResponse[PostDetailResponse],
     status_code=status.HTTP_201_CREATED,
     summary="게시글 작성",
     responses=INVALID_CATEGORY_RESPONSE
@@ -27,7 +27,7 @@ router = APIRouter(
 def create_post(
     request: PostCreateRequest,
     db: Session = Depends(get_db),
-) -> ApiResponse[PostCreateResponse]:
+) -> ApiResponse[PostDetailResponse]:
     post = PostController.create_post(
         db=db,
         request=request,
@@ -35,14 +35,14 @@ def create_post(
 
     return ApiResponse(
         success=True,
-        data=PostCreateResponse(
+        data=PostDetailResponse(
             post=PostResponse.model_validate(post),
         ),
         message="게시글이 작성되었습니다.",
     )
 
 @router.get(
-    "/{category}",
+    "/list/{category}",
     response_model=ApiResponse[PostGetResponse],
     summary="카테고리별 게시글 목록 조회",
     responses=INVALID_CATEGORY_RESPONSE
@@ -77,4 +77,36 @@ def get_posts(
             ],
         ),
         message=message,
+    )
+
+@router.get(
+    "/{post_id}",
+    response_model=ApiResponse[PostDetailResponse | None],
+    status_code=status.HTTP_200_OK,
+    summary="게시글 상세 조회",
+    responses=NOT_FOUND_POSTS
+)
+def get_post_detail(
+    post_id: int,
+    db: Session = Depends(get_db),
+) -> ApiResponse[PostDetailResponse | None]:
+    post = PostController.get_post_detail(
+        db=db,
+        post_id=post_id,
+    )
+
+    # if post is None:
+        
+    #     return ApiResponse(
+    #         success=False,
+    #         data=None,
+    #         message="게시글을 찾을 수 없습니다.",
+    #     )
+
+    return ApiResponse(
+        success=True,
+        data=PostDetailResponse(
+            post=PostResponse.model_validate(post),
+        ),
+        message="게시글 상세 정보를 조회했습니다.",
     )

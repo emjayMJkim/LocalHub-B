@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.model.post import Post
 from app.schemas.request.post_request import PostCreateRequest
 from app.core.api.constants import CATEGORY_LIST
-from app.core.api.exceptions import InvalidCategoryException
+from app.core.api.exceptions import InvalidCategoryException, PostNotFoundException
 
 
 class PostController:
@@ -42,6 +42,7 @@ class PostController:
                 detail="게시글 작성 중 오류가 발생했습니다.",
             ) from error
     
+
     @staticmethod
     def get_posts(
         db: Session,
@@ -78,3 +79,30 @@ class PostController:
         )
 
         return posts
+    
+
+    @staticmethod
+    def get_post_detail(
+        db: Session,
+        post_id: int,
+    ) -> Post | None:
+        post = db.get(Post, post_id)
+
+        if post is None:
+            raise PostNotFoundException()
+
+        try:
+            post.view_count += 1
+
+            db.commit()
+            db.refresh(post)
+
+            return post
+
+        except SQLAlchemyError as error:
+            db.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="게시글 상세 조회 중 오류가 발생했습니다.",
+            ) from error
