@@ -6,8 +6,8 @@ from datetime import datetime
 
 from app.model.post import Post
 from app.schemas.request.post_request import PostCreateRequest
-from app.core.api.constants import CATEGORY_LIST
-from app.core.api.exceptions import InvalidCategoryException, InvalidPasswordException, PostNotFoundException, InvalidKeywordException
+from app.core.util.constants import CATEGORY_LIST
+from app.core.exceptions.exceptions import InvalidCategoryException, InvalidPasswordException, PostNotFoundException, InvalidKeywordException
 
 
 class PostController:
