@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalHub Chat Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f5f7fb;
+      color: #222;
+    }
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .header {
+      background: #2563eb;
+      color: white;
+      padding: 16px 20px;
+      font-weight: bold;
+    }
+    .messages {
+      height: 420px;
+      overflow-y: auto;
+      padding: 16px;
+      background: #fafafa;
+    }
+    .message {
+      margin-bottom: 12px;
+      display: flex;
+    }
+    .message.user { justify-content: flex-end; }
+    .bubble {
+      max-width: 75%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .message.user .bubble {
+      background: #2563eb;
+      color: white;
+    }
+    .message.bot .bubble {
+      background: #e5e7eb;
+      color: #111;
+    }
+    .input-area {
+      display: flex;
+      border-top: 1px solid #ddd;
+      padding: 12px;
+      gap: 8px;
+    }
+    input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">LocalHub 챗봇 테스트</div>
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <input id="userInput" placeholder="메시지를 입력하세요" />
+      <button onclick="sendMessage()">전송</button>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('userInput');
+    const conversation = [];
+
+    function addMessage(role, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `message ${role}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      wrapper.appendChild(bubble);
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function createBotMessageBubble() {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message bot';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = '';
+      wrapper.appendChild(bubble);
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return bubble;
+    }
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      addMessage('user', text);
+      conversation.push({ role: 'user', content: text });
+      inputEl.value = '';
+      inputEl.disabled = true;
+
+      const botBubble = createBotMessageBubble();
+
+      try {
+        const response = await fetch('/api/v1/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify({
+            stream: true,
+            messages: conversation
+          })
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error('서버 응답이 올바르지 않습니다.');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() || '';
+
+          for (const frame of frames) {
+            const lines = frame.split('\n').map(line => line.trim());
+            let payload = '';
+
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                payload = line.slice(5).trim();
+              }
+            }
+
+            if (!payload) continue;
+            if (payload === '[DONE]') return;
+
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.delta != null) {
+                if (botBubble.textContent === '') {
+                  botBubble.textContent = parsed.delta;
+                } else {
+                  botBubble.textContent += parsed.delta;
+                }
+                scrollToBottom();
+              } else if (parsed.error) {
+                botBubble.textContent = parsed.error;
+              }
+            } catch (error) {
+              // ignore malformed frame
+            }
+          }
+        }
+
+        if (botBubble.textContent === '') {
+          botBubble.textContent = '응답이 비어 있습니다.';
+        }
+      } catch (error) {
+        botBubble.textContent = '요청 중 오류가 발생했습니다.';
+      } finally {
+        const finalText = botBubble.textContent;
+        if (finalText && finalText !== '응답 생성 중...') {
+          conversation.push({ role: 'assistant', content: finalText });
+        }
+        inputEl.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    inputEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
