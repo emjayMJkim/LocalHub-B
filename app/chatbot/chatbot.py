@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,19 @@ load_dotenv()
 
 DB_PATH = os.getenv("DB_PATH", "localhub.db")
 USE_OPENROUTER = os.getenv("USE_OPENROUTER", "false").lower() == "true"
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+LOG_DIR = ROOT_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / f"chatbot_{datetime.now().strftime('%Y-%m-%d')}.log"
+
+logger = logging.getLogger("localhub.chatbot")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(handler)
+logger.propagate = False
 
 
 class ChatbotService:
@@ -70,9 +85,28 @@ class ChatbotService:
             conn.close()
 
             result = [dict(row) for row in rows]
+            
+            # [수정] 결과가 없을 경우 명시적인 상수 반환
+            if not result:
+                return "NO_RESULTS_FOUND"
+                
             return json.dumps(result, ensure_ascii=False)
         except Exception as exc:  # pragma: no cover - defensive path
             return json.dumps({"error": str(exc)}, ensure_ascii=False)
+
+    def _log_event(self, event: str, payload: Any) -> None:
+        try:
+            if isinstance(payload, (dict, list)):
+                formatted = json.dumps(payload, ensure_ascii=False, indent=2)
+            else:
+                formatted = str(payload)
+            logger.info("%s | %s", event, formatted)
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.info("%s | logging_error: %s", event, exc)
+
+    def _extract_user_messages(self, messages: list[dict[str, Any]]) -> list[str]:
+        normalized_messages = self._normalize_messages(messages)
+        return [message.get("content", "") for message in normalized_messages if message.get("role") == "user"]
 
     def create_completion(
         self,
@@ -86,6 +120,8 @@ class ChatbotService:
         stream: bool = False,
         response_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        self._log_event("user_input", self._extract_user_messages(messages))
+
         payload = self._build_payload(
             model=model,
             messages=messages,
@@ -132,7 +168,7 @@ class ChatbotService:
                 }
 
             print("[chat] provider response ok", response.model_dump().get("id"))
-            return self._handle_tool_call_response(
+            result = self._handle_tool_call_response(
                 response=response,
                 model=model,
                 messages=messages,
@@ -142,6 +178,7 @@ class ChatbotService:
                 tool_choice=tool_choice,
                 response_format=response_format,
             )
+            return result
         except Exception as exc:
             print("[chat] provider error", type(exc).__name__, exc)
             return {
@@ -176,49 +213,75 @@ class ChatbotService:
     ) -> dict[str, Any]:
         response_payload = response.model_dump() if hasattr(response, "model_dump") else response
         tool_calls = self._extract_tool_calls(response_payload)
+        
         if not tool_calls:
             return response_payload
 
         conversation_messages = self._normalize_messages(messages)
         conversation_messages = self._prepend_system_prompt(conversation_messages)
-        conversation_messages.append(self._build_assistant_tool_message(response_payload))
+        
+        current_response_payload = response_payload
+        current_tool_calls = tool_calls
 
-        for tool_call in tool_calls:
-            function_name = tool_call.get("function", {}).get("name")
-            arguments = tool_call.get("function", {}).get("arguments", "{}")
-            if function_name != "execute_sqlite_query":
-                continue
+        # [수정] 다중 도구 호출(Multi-step Tool Calling) 루프
+        while current_tool_calls:
+            conversation_messages.append(self._build_assistant_tool_message(current_response_payload))
 
-            try:
-                parsed_args = json.loads(arguments) if isinstance(arguments, str) else arguments
-                query = parsed_args.get("query", "")
-            except Exception:
-                query = str(arguments)
+            for tool_call in current_tool_calls:
+                function_name = tool_call.get("function", {}).get("name")
+                arguments = tool_call.get("function", {}).get("arguments", "{}")
+                if function_name != "execute_sqlite_query":
+                    continue
 
-            tool_result = self.execute_sqlite_query(query)
-            conversation_messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.get("id", ""),
-                    "name": function_name,
-                    "content": tool_result,
-                }
+                try:
+                    parsed_args = json.loads(arguments) if isinstance(arguments, str) else arguments
+                    query = parsed_args.get("query", "")
+                except Exception:
+                    query = str(arguments)
+
+                # 로그에 SQL 쿼리 기록
+                self._log_event("llm_generated_query", query)
+                
+                tool_result = self.execute_sqlite_query(query)
+                
+                # 로그에 SQL 실행 결과 기록
+                self._log_event("query_execution_result", tool_result)
+                
+                # 빈 결과에 대한 명시적 안내 주입
+                if tool_result == "NO_RESULTS_FOUND":
+                    reported_result = "조회된 데이터가 없습니다. 이 경우 반드시 사용자에게 '조건에 맞는 관광 정보를 찾지 못했습니다.'라고 답변하십시오."
+                else:
+                    reported_result = tool_result
+
+                conversation_messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.get("id", ""),
+                        "name": function_name,
+                        "content": reported_result,
+                    }
+                )
+
+            # 도구 실행 결과를 포함하여 LLM 다시 호출
+            payload = self._build_payload(
+                model=model,
+                messages=conversation_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools, # 다중 호출을 위해 tools 유지
+                tool_choice=tool_choice,
+                stream=False,
+                response_format=response_format,
             )
 
-        # 2차 호출에서는 tools를 전달하지 않음 (자연어 답변 생성만)
-        follow_up_payload = self._build_payload(
-            model=model,
-            messages=conversation_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=None,
-            tool_choice=None,
-            stream=False,
-            response_format=response_format,
-        )
+            next_response = self.client.chat.completions.create(**payload)
+            current_response_payload = next_response.model_dump() if hasattr(next_response, "model_dump") else next_response
+            current_tool_calls = self._extract_tool_calls(current_response_payload)
 
-        follow_up_response = self.client.chat.completions.create(**follow_up_payload)
-        return follow_up_response.model_dump() if hasattr(follow_up_response, "model_dump") else follow_up_response
+        # 도구 호출이 끝난 최종 결과 처리
+        final_content = self._extract_message_content(current_response_payload)
+        self._log_event("llm_final_response", final_content)
+        return current_response_payload
 
     def _extract_tool_calls(self, response_payload: dict[str, Any]) -> list[dict[str, Any]]:
         choices = response_payload.get("choices", [])
@@ -276,25 +339,44 @@ class ChatbotService:
         tool_choice: str | None = None,
         response_format: dict[str, Any] | None = None,
     ):
-        first_payload = self._build_payload(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=tools,
-            tool_choice=tool_choice,
-            stream=False,
-            response_format=response_format,
-        )
+        self._log_event("user_input", self._extract_user_messages(messages))
 
-        try:
-            first_response = self.client.chat.completions.create(**first_payload)
-            response_payload = first_response.model_dump() if hasattr(first_response, "model_dump") else first_response
-            tool_calls = self._extract_tool_calls(response_payload)
+        conversation_messages = self._normalize_messages(messages)
+        conversation_messages = self._prepend_system_prompt(conversation_messages)
 
-            if tool_calls:
-                conversation_messages = self._normalize_messages(messages)
-                conversation_messages = self._prepend_system_prompt(conversation_messages)
+        has_tool_calls = False
+
+        # [수정] 다중 도구 호출(Multi-step Tool Calling) 루프 - 스트리밍용
+        while True:
+            payload = self._build_payload(
+                model=model,
+                messages=conversation_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                tool_choice=tool_choice,
+                stream=False, # 도구 호출을 온전히 받기 위해 비스트리밍으로 실행
+                response_format=response_format,
+            )
+
+            try:
+                response = self.client.chat.completions.create(**payload)
+                response_payload = response.model_dump() if hasattr(response, "model_dump") else response
+                tool_calls = self._extract_tool_calls(response_payload)
+
+                if not tool_calls:
+                    if not has_tool_calls:
+                        # 최초 호출에서 도구를 전혀 사용하지 않았다면 그대로 단일 출력 후 종료
+                        content = self._extract_message_content(response_payload)
+                        if content:
+                            self._log_event("llm_final_response", content)
+                            yield content
+                        return
+                    else:
+                        # 이전 루프에서 도구를 사용했고 이제 답변할 준비가 완료된 경우
+                        break
+
+                has_tool_calls = True
                 conversation_messages.append(self._build_assistant_tool_message(response_payload))
 
                 for tool_call in tool_calls:
@@ -309,45 +391,57 @@ class ChatbotService:
                     except Exception:
                         query = str(arguments)
 
+                    self._log_event("llm_generated_query", query)
                     tool_result = self.execute_sqlite_query(query)
+                    self._log_event("query_execution_result", tool_result)
+
+                    if tool_result == "NO_RESULTS_FOUND":
+                        reported_result = "조회된 데이터가 없습니다. 이 경우 반드시 사용자에게 '조건에 맞는 관광 정보를 찾지 못했습니다.'라고 답변하십시오."
+                    else:
+                        reported_result = tool_result
+
                     conversation_messages.append(
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.get("id", ""),
                             "name": function_name,
-                            "content": tool_result,
+                            "content": reported_result,
                         }
                     )
-
-                follow_up_payload = self._build_payload(
-                    model=model,
-                    messages=conversation_messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=None,
-                    tool_choice=None,
-                    stream=True,
-                    response_format=response_format,
-                )
-
-                follow_up_stream = self.client.chat.completions.create(**follow_up_payload)
-                for chunk in follow_up_stream:
-                    delta = getattr(chunk, "choices", [None])[0]
-                    if delta is None:
-                        continue
-                    chunk_delta = getattr(delta, "delta", None)
-                    if chunk_delta is None:
-                        continue
-                    content = getattr(chunk_delta, "content", None)
-                    if content:
-                        yield content
+            except Exception as exc:
+                print("[chat] stream loop error", type(exc).__name__, exc)
+                yield "현재 서버에서 외부 AI 응답을 받지 못했습니다. 잠시 후 다시 시도해주세요."
                 return
 
-            content = self._extract_message_content(response_payload)
-            if content:
-                yield content
+        # 모든 도구 호출이 끝나면 스트리밍 모드로 최종 응답 생성
+        follow_up_payload = self._build_payload(
+            model=model,
+            messages=conversation_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=None, # 자연어 생성을 강제하기 위해 도구 비활성화
+            tool_choice=None,
+            stream=True,
+            response_format=response_format,
+        )
+
+        try:
+            follow_up_stream = self.client.chat.completions.create(**follow_up_payload)
+            assembled_chunks: list[str] = []
+            for chunk in follow_up_stream:
+                delta = getattr(chunk, "choices", [None])[0]
+                if delta is None:
+                    continue
+                chunk_delta = getattr(delta, "delta", None)
+                if chunk_delta is None:
+                    continue
+                content = getattr(chunk_delta, "content", None)
+                if content:
+                    assembled_chunks.append(content)
+                    yield content
+            self._log_event("llm_final_response", "".join(assembled_chunks))
         except Exception as exc:
-            print("[chat] stream error", type(exc).__name__, exc)
+            print("[chat] stream final follow-up error", type(exc).__name__, exc)
             yield "현재 서버에서 외부 AI 응답을 받지 못했습니다. 잠시 후 다시 시도해주세요."
 
     def _extract_message_content(self, response_payload: Any) -> str:
@@ -409,10 +503,9 @@ class ChatbotService:
             "stream": stream,
         }
 
-        if temperature is not None:
-            payload["temperature"] = temperature
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+        # temperature와 max_tokens는 None일 경우 기본값을 설정 (넉넉하게 8192 설정)
+        payload["temperature"] = 1.0 if temperature is None else temperature
+        payload["max_tokens"] = 8192 if max_tokens is None else max_tokens
         
         # tools 처리: 명시적으로 전달된 경우와 기본값 구분
         if tools is not None:
