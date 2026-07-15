@@ -31,7 +31,7 @@ def create_tables(cursor):
         ON places (mapx, mapy)
     ''')
 
-    # 3. 자연어 검색을 위한 FTS5 가상 테이블
+    # 3. Trigram 토크나이저를 적용한 FTS5 가상 테이블
     cursor.execute('''
         CREATE VIRTUAL TABLE IF NOT EXISTS places_fts USING fts5(
             contentid UNINDEXED,
@@ -39,7 +39,7 @@ def create_tables(cursor):
             addr1,
             contentType,
             region,
-            tokenize='unicode61'
+            tokenize='trigram'
         )
     ''')
 
