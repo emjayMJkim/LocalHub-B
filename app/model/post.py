@@ -7,7 +7,7 @@ from app.database.database import Base
 
 
 class Post(Base):
-    __tablename__ = "posts"
+    __tablename__ = "community"
 
     id: Mapped[int] = mapped_column(
         Integer,
