@@ -21,3 +21,7 @@ class PostSearchResponse(BaseModel):
     keyword: str
     category: str
     posts: list[PostPreviewItemResponse]
+
+class PostLikeResponse(BaseModel):
+    post_id: int
+    like_count: int
