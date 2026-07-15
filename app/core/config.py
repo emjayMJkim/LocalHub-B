@@ -4,8 +4,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-APP_DIR = Path(__file__).resolve().parent.parent
-ENV_FILE = APP_DIR / ".env"
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = ROOT_DIR / ".env"
 
 class Settings(BaseSettings):
     app_name: str = "지역정보 공유 커뮤니티 API"
