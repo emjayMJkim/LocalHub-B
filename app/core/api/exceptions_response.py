@@ -13,6 +13,21 @@ INVALID_CATEGORY_RESPONSE = {
     }
 }
 
+FORBIDDEN_PASSWORD = {
+    403: {
+        "description": "비밀번호 불일치",
+        "content": {
+            "application/json": {
+                "example": {
+                    "success": False,
+                    "data": {},
+                    "message": "비밀번호가 일치하지 않습니다."
+                }
+            }
+        }
+    }
+}
+
 NOT_FOUND_POSTS = {
     404 : {
         "description": "게시글 없음",

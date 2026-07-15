@@ -2,11 +2,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.model.post import Post
 from app.schemas.request.post_request import PostCreateRequest
 from app.core.api.constants import CATEGORY_LIST
-from app.core.api.exceptions import InvalidCategoryException, PostNotFoundException
+from app.core.api.exceptions import InvalidCategoryException, InvalidPasswordException, PostNotFoundException 
 
 
 class PostController:
@@ -105,4 +106,44 @@ class PostController:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="게시글 상세 조회 중 오류가 발생했습니다.",
+            ) from error
+
+
+    @staticmethod
+    def update_post(
+        db: Session,
+        post_id: int,
+        request: PostCreateRequest,
+    ) -> Post:
+
+        if request.category not in CATEGORY_LIST:
+            raise InvalidCategoryException()
+
+        post = db.get(Post, post_id)
+
+        if post is None:
+            raise PostNotFoundException()
+
+        if post.password != request.password:
+            raise InvalidPasswordException()
+
+        post.category = request.category
+        post.title = request.title
+        post.content = request.content
+        post.updated_at = datetime.now()
+
+        try:
+
+            db.commit()
+            db.refresh(post)
+
+            return post
+
+        except SQLAlchemyError as error:
+
+            db.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="게시글 수정 중 오류가 발생했습니다."
             ) from error

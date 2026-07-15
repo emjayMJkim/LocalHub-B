@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS
+from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS, FORBIDDEN_PASSWORD
 from app.core.api.constants import get_category_name
 from app.controller.post import PostController
 from app.database.session import get_db
@@ -95,18 +95,36 @@ def get_post_detail(
         post_id=post_id,
     )
 
-    # if post is None:
-        
-    #     return ApiResponse(
-    #         success=False,
-    #         data=None,
-    #         message="게시글을 찾을 수 없습니다.",
-    #     )
-
     return ApiResponse(
         success=True,
         data=PostDetailResponse(
             post=PostResponse.model_validate(post),
         ),
         message="게시글 상세 정보를 조회했습니다.",
+    )
+
+@router.put(
+    "/{post_id}",
+    response_model=ApiResponse[PostDetailResponse],
+    summary="게시글 수정",
+    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS,
+)
+def update_post(
+    post_id: int,
+    request: PostCreateRequest,
+    db: Session = Depends(get_db),
+):
+
+    post = PostController.update_post(
+        db=db,
+        post_id=post_id,
+        request=request,
+    )
+
+    return ApiResponse(
+        success=True,
+        data=PostDetailResponse(
+            post=PostResponse.model_validate(post)
+        ),
+        message="게시글이 수정되었습니다."
     )
