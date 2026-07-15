@@ -20,11 +20,30 @@
 - 위치 검색 시 `mapx`, `mapy` 컬럼을 사용하여 거리를 계산하고 정렬한다.
 - 지역+키워드 조합 시 `places_fts`와 `places`를 `JOIN`하여 조회한다.
 
+# [필수 위치 검색 규칙]
+- 사용자 질의에 "근처", "가까운", "주변" 등이 포함된 경우, 반드시 places 테이블의 mapx(경도), mapy(위도)를 이용한 위치 기반 검색을 우선 수행한다.
+- FTS5(전문 검색)는 위치 검색으로 찾을 수 없을 때만 차선책으로 사용한다.
+- 위치 검색 시에는 반드시 Bounding Box로 후보를 먼저 필터링한 후, Haversine 공식을 사용하여 거리순으로 정렬한다.
+
 # 질의 유형별 검색어 정규화 및 확장
 - 사용자 질의를 그대로 사용하지 말고, 의도를 분석하여 검색 키워드로 정규화한다.
 - 키워드 확장 예시: 
   - "맛집" → "음식점", "빵집" → "베이커리 OR 제과점", "숙소" → "호텔 OR 펜션 OR 게스트하우스", "커피" → "카페", "전통시장" → "시장"
 - 장소명은 임의 변경하지 않는다 (예: "성심당" → "성심당").
+
+# 콘텐츠 유형 매핑
+사용자 질의 의도를 분석하여 `contentType`과 매핑한다.
+
+| 키워드 그룹 | 매핑될 contentType | 해당 contentTypeId |
+|-------------|--------------------|-------------------|
+| 관광지, 여행지, 명소 | 관광지 | 12 |
+| 문화시설, 미술관, 박물관 | 문화시설 | 14 |
+| 축제, 공연, 행사 | 축제공연행사 | 15 |
+| 여행코스 | 여행코스 | 25 |
+| 레포츠, 스포츠, 액티비티 | 레포츠 | 28 |
+| 숙박, 호텔, 펜션 | 숙박 | 32 |
+| 쇼핑, 시장, 백화점 | 쇼핑 | 38 |
+| 음식점, 맛집, 식당 | 음식점 | 39 |
 
 # FTS5 MATCH 작성 규칙 (필수)
 - MATCH 연산자 사용 시, 검색어 뒤에 반드시 와일드카드(`*`)를 포함한다.
@@ -70,6 +89,10 @@
    SELECT p.* FROM places_fts JOIN places p ON p.contentid = places_fts.contentid 
    WHERE places_fts MATCH '검색어*' ORDER BY bm25(places_fts) LIMIT 10;
 
-2. 지역+키워드 검색:
+2. 콘텐츠 유형 필터 검색:
+   SELECT p.* FROM places_fts JOIN places p ON p.contentid = places_fts.contentid 
+   WHERE p.contentType = '콘텐츠' ORDER BY bm25(places_fts) LIMIT 10;
+
+3. 지역+키워드 검색:
    SELECT p.* FROM places_fts JOIN places p ON p.contentid = places_fts.contentid 
    WHERE places_fts MATCH '키워드*' AND p.region = '지역명' ORDER BY bm25(places_fts) LIMIT 10;
