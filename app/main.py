@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.router.router import api_router
@@ -19,6 +22,14 @@ app = FastAPI(
     version = settings.app_version,
     lifespan=lifespan
 )
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/chat-test", response_class=HTMLResponse)
+async def chat_test_page() -> HTMLResponse:
+    html_path = STATIC_DIR / "chat_test.html"
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(
