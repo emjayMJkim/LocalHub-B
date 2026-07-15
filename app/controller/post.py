@@ -147,3 +147,32 @@ class PostController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="게시글 수정 중 오류가 발생했습니다."
             ) from error
+
+
+    @staticmethod
+    def delete_post(
+        db: Session,
+        post_id: int,
+        password: str,
+    ) -> int:
+        post = db.get(Post, post_id)
+
+        if post is None:
+            raise PostNotFoundException()
+
+        if post.password != password:
+            raise InvalidPasswordException()
+
+        try:
+            db.delete(post)
+            db.commit()
+
+            return post_id
+
+        except SQLAlchemyError as error:
+            db.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="게시글 삭제 중 오류가 발생했습니다.",
+            ) from error

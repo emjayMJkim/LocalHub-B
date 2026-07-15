@@ -12,3 +12,6 @@ class PostGetResponse(BaseModel):
     category: str
     category_name: str
     posts: list[PostListItemResponse]
+
+class PostDeleteResponse(BaseModel):
+    deleted_post_id: int

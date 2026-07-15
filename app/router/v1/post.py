@@ -6,8 +6,8 @@ from app.core.api.constants import get_category_name
 from app.controller.post import PostController
 from app.database.session import get_db
 from app.schemas.base import ApiResponse
-from app.schemas.request.post_request import PostCreateRequest
-from app.schemas.response.post_response import PostDetailResponse, PostGetResponse
+from app.schemas.request.post_request import PostCreateRequest, PostDeleteRequest
+from app.schemas.response.post_response import PostDetailResponse, PostGetResponse, PostDeleteResponse
 from app.schemas.common.post_common import PostResponse, PostListItemResponse
 
 
@@ -82,7 +82,6 @@ def get_posts(
 @router.get(
     "/{post_id}",
     response_model=ApiResponse[PostDetailResponse | None],
-    status_code=status.HTTP_200_OK,
     summary="게시글 상세 조회",
     responses=NOT_FOUND_POSTS
 )
@@ -127,4 +126,29 @@ def update_post(
             post=PostResponse.model_validate(post)
         ),
         message="게시글이 수정되었습니다."
+    )
+
+@router.delete(
+    "/{post_id}",
+    response_model=ApiResponse[PostDeleteResponse],
+    summary="게시글 삭제",
+    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS,
+)
+def delete_post(
+    post_id: int,
+    request: PostDeleteRequest,
+    db: Session = Depends(get_db),
+) -> ApiResponse[PostDeleteResponse]:
+    deleted_post_id = PostController.delete_post(
+        db=db,
+        post_id=post_id,
+        password=request.password,
+    )
+
+    return ApiResponse(
+        success=True,
+        data=PostDeleteResponse(
+            deleted_post_id=deleted_post_id,
+        ),
+        message="게시글이 삭제되었습니다.",
     )
