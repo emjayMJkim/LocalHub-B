@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -7,7 +7,7 @@ from datetime import datetime
 from app.model.post import Post
 from app.schemas.request.post_request import PostCreateRequest
 from app.core.api.constants import CATEGORY_LIST
-from app.core.api.exceptions import InvalidCategoryException, InvalidPasswordException, PostNotFoundException 
+from app.core.api.exceptions import InvalidCategoryException, InvalidPasswordException, PostNotFoundException, InvalidKeywordException
 
 
 class PostController:
@@ -16,11 +16,13 @@ class PostController:
         db: Session,
         request: PostCreateRequest,
     ) -> Post:
-        if request.category not in CATEGORY_LIST:
+        category = request.category.upper()
+
+        if category not in CATEGORY_LIST:
             raise InvalidCategoryException()
 
         new_post = Post(
-            category=request.category,
+            category=category,
             title=request.title,
             content=request.content,
             password=request.password,
@@ -115,8 +117,10 @@ class PostController:
         post_id: int,
         request: PostCreateRequest,
     ) -> Post:
+        
+        category = request.category.upper()
 
-        if request.category not in CATEGORY_LIST:
+        if category not in CATEGORY_LIST:
             raise InvalidCategoryException()
 
         post = db.get(Post, post_id)
@@ -127,7 +131,7 @@ class PostController:
         if post.password != request.password:
             raise InvalidPasswordException()
 
-        post.category = request.category
+        post.category = category
         post.title = request.title
         post.content = request.content
         post.updated_at = datetime.now()
@@ -176,3 +180,42 @@ class PostController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="게시글 삭제 중 오류가 발생했습니다.",
             ) from error
+        
+
+    @staticmethod
+    def search_posts(
+        db: Session,
+        keyword: str,
+        category: str = "DEFAULT",
+    ) -> list[Post]:
+        normalized_category = category.strip().upper()
+        normalized_keyword = keyword.strip()
+
+        if not normalized_keyword:
+            raise InvalidKeywordException()
+
+        if normalized_category not in CATEGORY_LIST:
+            raise InvalidCategoryException()
+
+        search_pattern = f"%{normalized_keyword}%"
+
+        statement = select(Post).where(
+            or_(
+                Post.title.ilike(search_pattern),
+                Post.content.ilike(search_pattern),
+            )
+        )
+
+        # DEFAULT가 아니면 해당 카테고리 조건 추가
+        if normalized_category != "DEFAULT":
+            statement = statement.where(
+                Post.category == normalized_category
+            )
+
+        statement = statement.order_by(
+            Post.created_at.desc()
+        )
+
+        posts = db.scalars(statement).all()
+
+        return list(posts)

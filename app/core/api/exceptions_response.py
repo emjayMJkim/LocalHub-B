@@ -43,6 +43,21 @@ NOT_FOUND_POSTS = {
     }
 }
 
+MUST_CHECK_CONTENT = {
+    422 : {
+        "description": "잘못된 입력값",
+        "content": {
+            "application/json": {
+                "example": {
+                    "success": False,
+                    "data": {},
+                    "message": "입력값을 확인해 주세요.",
+                }
+            }
+        },
+    }
+}
+
 POST_CREATE_DB_ERROR_RESPONSE = {
     500: {
         "description": "DB 오류",

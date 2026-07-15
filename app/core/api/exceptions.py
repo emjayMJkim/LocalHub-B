@@ -21,3 +21,10 @@ class PostNotFoundException(HTTPException):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="게시글을 찾을 수 없습니다."
         )
+
+class InvalidKeywordException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="입력값을 확인해 주세요."
+        )

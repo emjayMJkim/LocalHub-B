@@ -8,9 +8,4 @@ class PostCreateRequest(BaseModel):
     password: str = Field(min_length=2, max_length=20,)
 
 class PostDeleteRequest(BaseModel):
-    password: str = Field(
-        min_length=2,
-        max_length=20,
-        description="게시글 수정·삭제용 비밀번호",
-        examples=["1234"],
-    )
+    password: str = Field(min_length=2, max_length=20,)

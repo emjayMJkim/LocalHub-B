@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.common.post_common import PostResponse, PostListItemResponse
+
+from app.schemas.common.post_common import PostResponse, PostListItemResponse, PostPreviewItemResponse
 
 
 class PostDetailResponse(BaseModel):
@@ -15,3 +16,8 @@ class PostGetResponse(BaseModel):
 
 class PostDeleteResponse(BaseModel):
     deleted_post_id: int
+
+class PostSearchResponse(BaseModel):
+    keyword: str
+    category: str
+    posts: list[PostPreviewItemResponse]

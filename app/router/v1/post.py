@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
-from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS, FORBIDDEN_PASSWORD
+from app.core.api.exceptions_response import INVALID_CATEGORY_RESPONSE, NOT_FOUND_POSTS, FORBIDDEN_PASSWORD, MUST_CHECK_CONTENT
 from app.core.api.constants import get_category_name
+from app.core.util.content_preview import create_content_preview
 from app.controller.post import PostController
 from app.database.session import get_db
 from app.schemas.base import ApiResponse
 from app.schemas.request.post_request import PostCreateRequest, PostDeleteRequest
-from app.schemas.response.post_response import PostDetailResponse, PostGetResponse, PostDeleteResponse
-from app.schemas.common.post_common import PostResponse, PostListItemResponse
+from app.schemas.response.post_response import PostDetailResponse, PostGetResponse, PostDeleteResponse, PostSearchResponse
+from app.schemas.common.post_common import PostResponse, PostListItemResponse, PostPreviewItemResponse
 
 
 router = APIRouter(
@@ -22,7 +23,7 @@ router = APIRouter(
     response_model=ApiResponse[PostDetailResponse],
     status_code=status.HTTP_201_CREATED,
     summary="게시글 작성",
-    responses=INVALID_CATEGORY_RESPONSE
+    responses=INVALID_CATEGORY_RESPONSE | MUST_CHECK_CONTENT
 )
 def create_post(
     request: PostCreateRequest,
@@ -45,7 +46,7 @@ def create_post(
     "/list/{category}",
     response_model=ApiResponse[PostGetResponse],
     summary="카테고리별 게시글 목록 조회",
-    responses=INVALID_CATEGORY_RESPONSE
+    responses=INVALID_CATEGORY_RESPONSE | MUST_CHECK_CONTENT
 )
 def get_posts(
     category: str,
@@ -80,10 +81,60 @@ def get_posts(
     )
 
 @router.get(
+    "/search",
+    response_model=ApiResponse[PostSearchResponse],
+    summary="게시글 검색",
+    responses=INVALID_CATEGORY_RESPONSE | MUST_CHECK_CONTENT,
+)
+def search_posts(
+    keyword: str = Query(...,min_length=1,),
+    category: str = Query(default="DEFAULT",),
+    db: Session = Depends(get_db),
+) -> ApiResponse[PostSearchResponse]:
+    normalized_keyword = keyword.strip()
+    normalized_category = category.strip().upper()
+
+    posts = PostController.search_posts(
+        db=db,
+        keyword=normalized_keyword,
+        category=normalized_category,
+    )
+
+    search_items = [
+        PostPreviewItemResponse(
+            id=post.id,
+            category=post.category,
+            title=post.title,
+            content_preview=create_content_preview(post.content),
+            view_count=post.view_count,
+            like_count=post.like_count,
+            created_at=post.created_at,
+            updated_at=post.updated_at,
+        )
+        for post in posts
+    ]
+
+    message = (
+        "게시글 검색이 완료되었습니다."
+        if search_items
+        else "검색 결과가 없습니다."
+    )
+
+    return ApiResponse(
+        success=True,
+        data=PostSearchResponse(
+            keyword=normalized_keyword,
+            category=normalized_category,
+            posts=search_items,
+        ),
+        message=message,
+    )
+
+@router.get(
     "/{post_id}",
     response_model=ApiResponse[PostDetailResponse | None],
     summary="게시글 상세 조회",
-    responses=NOT_FOUND_POSTS
+    responses=NOT_FOUND_POSTS | MUST_CHECK_CONTENT
 )
 def get_post_detail(
     post_id: int,
@@ -106,7 +157,7 @@ def get_post_detail(
     "/{post_id}",
     response_model=ApiResponse[PostDetailResponse],
     summary="게시글 수정",
-    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS,
+    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS | MUST_CHECK_CONTENT,
 )
 def update_post(
     post_id: int,
@@ -132,7 +183,7 @@ def update_post(
     "/{post_id}",
     response_model=ApiResponse[PostDeleteResponse],
     summary="게시글 삭제",
-    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS,
+    responses=FORBIDDEN_PASSWORD | NOT_FOUND_POSTS | MUST_CHECK_CONTENT,
 )
 def delete_post(
     post_id: int,

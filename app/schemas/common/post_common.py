@@ -24,3 +24,13 @@ class PostListItemResponse(BaseModel):
     like_count: int
     created_at: datetime
     updated_at: datetime | None
+
+class PostPreviewItemResponse(BaseModel):
+    id: int
+    category: str
+    title: str
+    content_preview: str
+    view_count: int
+    like_count: int
+    created_at: datetime
+    updated_at: datetime | None
