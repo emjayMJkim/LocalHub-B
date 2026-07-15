@@ -17,3 +17,4 @@ requests
 numpy
 
 # LLM & AI
+openai
