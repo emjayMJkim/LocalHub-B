@@ -43,6 +43,21 @@ NOT_FOUND_POSTS = {
     }
 }
 
+NOT_FOUND_LOCATIONS = {
+    404 : {
+        "description": "등록된 지역 정보 없음",
+        "content": {
+            "application/json": {
+                "example": {
+                    "success": False,
+                    "data": {},
+                    "message": "등록된 지역 정보가 없습니다.",
+                }
+            }
+        },
+    }
+}
+
 MUST_CHECK_CONTENT = {
     422 : {
         "description": "잘못된 입력값",
