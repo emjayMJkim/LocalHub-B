@@ -22,6 +22,13 @@ class PostNotFoundException(HTTPException):
             detail="게시글을 찾을 수 없습니다."
         )
 
+class LocationNotFoundException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="등록된 지역 정보가 없습니다."
+        )
+
 class InvalidKeywordException(HTTPException):
     def __init__(self):
         super().__init__(

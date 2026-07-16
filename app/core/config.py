@@ -12,7 +12,13 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     api_v1_prefix: str = "/api/v1"
 
+    # Database
     database_url: str
+
+    # Frontend
+    front_url: str
+    front_url_dev: str
+    front_url_dev2: str
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

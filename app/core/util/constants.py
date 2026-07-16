@@ -12,5 +12,16 @@ CATEGORY_NAME = {
 
 CATEGORY_LIST = CATEGORY_NAME.keys()
 
+CONTENT_TYPE_CATEGORY: dict[str, str] = {
+    content_type: category
+    for category, content_type in CATEGORY_NAME.items()
+}
+
+
 def get_category_name(category: str) -> str:
     return CATEGORY_NAME.get(category.upper(), "")
+
+def get_category_code_by_content_type(
+    content_type: str,
+) -> str:
+    return CONTENT_TYPE_CATEGORY.get(content_type, "")

@@ -7,3 +7,8 @@ class LocationInfoListResponse(BaseModel):
     category: str
     category_name: str
     items: list[LocationListItemResponse]
+
+class LocationInfoDetailResponse(BaseModel):
+    category: str
+    category_name: str
+    location: LocationListItemResponse

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class LocationListItemResponse(BaseModel):
-    content_id: int
+    content_id: str
     title: str
     phone: str = " - "
     address: str = " - "
