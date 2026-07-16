@@ -27,7 +27,6 @@ def create_chat(request: ChatRequest):
     stream_kwargs = {
         "model": None,
         "messages": normalized_messages,
-        "response_format": request.response_format,
     }
 
     if getattr(request, "stream", False):

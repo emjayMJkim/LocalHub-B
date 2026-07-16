@@ -118,7 +118,6 @@ class ChatbotService:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | None = None,
         stream: bool = False,
-        response_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         self._log_event("user_input", self._extract_user_messages(messages))
 
@@ -130,7 +129,6 @@ class ChatbotService:
             tools=tools,
             tool_choice=tool_choice,
             stream=stream,
-            response_format=response_format,
         )
 
         try:
@@ -176,7 +174,6 @@ class ChatbotService:
                 max_tokens=max_tokens,
                 tools=tools,
                 tool_choice=tool_choice,
-                response_format=response_format,
             )
             return result
         except Exception as exc:
@@ -209,7 +206,6 @@ class ChatbotService:
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | None = None,
-        response_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         response_payload = response.model_dump() if hasattr(response, "model_dump") else response
         tool_calls = self._extract_tool_calls(response_payload)
@@ -271,7 +267,6 @@ class ChatbotService:
                 tools=tools, # 다중 호출을 위해 tools 유지
                 tool_choice=tool_choice,
                 stream=False,
-                response_format=response_format,
             )
 
             next_response = self.client.chat.completions.create(**payload)
@@ -337,7 +332,6 @@ class ChatbotService:
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | None = None,
-        response_format: dict[str, Any] | None = None,
     ):
         self._log_event("user_input", self._extract_user_messages(messages))
 
@@ -356,7 +350,6 @@ class ChatbotService:
                 tools=tools,
                 tool_choice=tool_choice,
                 stream=False, # 도구 호출을 온전히 받기 위해 비스트리밍으로 실행
-                response_format=response_format,
             )
 
             try:
@@ -422,7 +415,6 @@ class ChatbotService:
             tools=None, # 자연어 생성을 강제하기 위해 도구 비활성화
             tool_choice=None,
             stream=True,
-            response_format=response_format,
         )
 
         try:
@@ -474,7 +466,6 @@ class ChatbotService:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | None = None,
         stream: bool = False,
-        response_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         normalized_messages: list[dict[str, Any]] = []
         for message in messages:
@@ -517,8 +508,5 @@ class ChatbotService:
             payload["tool_choice"] = tool_choice
         elif "tools" in payload:  # tools가 포함되었으면 기본 tool_choice 추가
             payload["tool_choice"] = "auto"
-        
-        if response_format is not None:
-            payload["response_format"] = response_format
 
         return payload
