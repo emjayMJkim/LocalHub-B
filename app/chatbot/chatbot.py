@@ -503,9 +503,8 @@ class ChatbotService:
             "stream": stream,
         }
 
-        # temperature와 max_tokens는 None일 경우 기본값을 설정 (넉넉하게 8192 설정)
-        payload["temperature"] = 1.0 if temperature is None else temperature
-        payload["max_tokens"] = 8192 if max_tokens is None else max_tokens
+        # payload["temperature"] = 1.0 if temperature is None else temperature
+        # payload["max_tokens"] = 8192 if max_tokens is None else max_tokens
         
         # tools 처리: 명시적으로 전달된 경우와 기본값 구분
         if tools is not None:
