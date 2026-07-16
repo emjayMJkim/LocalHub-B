@@ -38,6 +38,7 @@ def get_locations(
 
     items = [
         LocationListItemResponse(
+            content_id=place.contentid or 0,
             title=place.title or "",
             phone=place.tel.strip() if place.tel and place.tel.strip() else "",
             address=combine_address(
@@ -48,6 +49,9 @@ def get_locations(
                 firstimage=place.firstimage,
                 firstimage2=place.firstimage2,
             ) or "",
+            mapx=place.mapx or 0.0,
+            mapy=place.mapy or 0.0,
+            createdtime=place.createdtime or ""
         )
         for place in places
     ]

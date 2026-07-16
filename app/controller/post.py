@@ -219,3 +219,30 @@ class PostController:
         posts = db.scalars(statement).all()
 
         return list(posts)
+    
+
+    @staticmethod
+    def like_post(
+        db: Session,
+        post_id: int,
+    ) -> Post:
+        post = db.get(Post, post_id)
+
+        if post is None:
+            raise PostNotFoundException()
+
+        try:
+            post.like_count += 1
+
+            db.commit()
+            db.refresh(post)
+
+            return post
+
+        except SQLAlchemyError as error:
+            db.rollback()
+
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="게시글 좋아요 처리 중 오류가 발생했습니다.",
+            ) from error

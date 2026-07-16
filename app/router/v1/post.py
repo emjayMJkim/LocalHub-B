@@ -8,7 +8,7 @@ from app.controller.post import PostController
 from app.database.session import get_db
 from app.schemas.base import ApiResponse
 from app.schemas.request.post_request import PostCreateRequest, PostDeleteRequest
-from app.schemas.response.post_response import PostDetailResponse, PostGetResponse, PostDeleteResponse, PostSearchResponse
+from app.schemas.response.post_response import PostDetailResponse, PostGetResponse, PostDeleteResponse, PostSearchResponse, PostLikeResponse
 from app.schemas.common.post_common import PostResponse, PostListItemResponse, PostPreviewItemResponse
 
 
@@ -40,6 +40,30 @@ def create_post(
             post=PostResponse.model_validate(post),
         ),
         message="게시글이 작성되었습니다.",
+    )
+
+@router.post(
+    "/{post_id}/like",
+    response_model=ApiResponse[PostLikeResponse],
+    summary="게시글 좋아요",
+    responses=NOT_FOUND_POSTS | MUST_CHECK_CONTENT,
+)
+def like_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+) -> ApiResponse[PostLikeResponse]:
+    post = PostController.like_post(
+        db=db,
+        post_id=post_id,
+    )
+
+    return ApiResponse(
+        success=True,
+        data=PostLikeResponse(
+            post_id=post.id,
+            like_count=post.like_count,
+        ),
+        message="게시글 좋아요가 반영되었습니다.",
     )
 
 @router.get(
