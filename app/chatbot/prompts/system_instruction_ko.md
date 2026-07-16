@@ -36,18 +36,18 @@
 - 장소명은 임의 변경하지 않습니다 (예: "성심당" → "성심당").
 
 # 콘텐츠 유형 매핑
-사용자 질의 의도를 분석하여 `contentType`과 매핑합니다.
+- SQL 작성 시 `contentType` 조건값은 반드시 아래 표의 '정확한 contentType 값'에 명시된 한글 문자열만 사용해야 합니다.
 
-| 키워드 그룹 | 매핑될 contentType | 해당 contentTypeId |
-|-------------|--------------------|-------------------|
-| 관광지, 여행지, 명소 | 관광지 | 12 |
-| 문화시설, 미술관, 박물관 | 문화시설 | 14 |
-| 축제, 공연, 행사 | 축제공연행사 | 15 |
-| 여행코스 | 여행코스 | 25 |
-| 레포츠, 스포츠, 액티비티 | 레포츠 | 28 |
-| 숙박, 호텔, 펜션 | 숙박 | 32 |
-| 쇼핑, 시장, 백화점 | 쇼핑 | 38 |
-| 음식점, 맛집, 식당 | 음식점 | 39 |
+| 질의 키워드 예시 | 정확한 contentType 값 |
+|-------------|--------------------|
+| 관광지, 여행지, 명소 | '관광지' |
+| 문화시설, 미술관, 박물관 | '문화시설' |
+| 축제, 공연, 행사 | '축제공연행사' |
+| 여행코스 | '여행코스' |
+| 레포츠, 스포츠, 액티비티 | '레포츠' |
+| 숙박, 호텔, 펜션, 게스트하우스 | '숙박' |
+| 쇼핑, 시장, 백화점 | '쇼핑' |
+| 음식점, 맛집, 식당, 카페 | '음식점' |
 
 # FTS5 MATCH 작성 규칙 (필수)
 - MATCH 연산자 사용 시, 검색어 뒤에 반드시 와일드카드(`*`)를 포함합니다.
@@ -99,3 +99,12 @@
 3. 지역+키워드 검색:
    SELECT p.* FROM places_fts JOIN places p ON p.contentid = places_fts.contentid 
    WHERE places_fts MATCH '키워드*' AND p.region = '지역명' ORDER BY bm25(places_fts) LIMIT 5;
+
+4. 위치 기반 거리순 검색:
+   SELECT p.*,
+   (6371 * acos(cos(radians(타겟위도)) * cos(radians(p.mapy)) * cos(radians(p.mapx) - radians(타겟경도)) + sin(radians(타겟위도)) * sin(radians(p.mapy)))) AS distance
+   FROM places p
+   WHERE p.contentType = '숙박'
+     AND p.mapy BETWEEN 타겟위도 - 0.05 AND 타겟위도 + 0.05
+     AND p.mapx BETWEEN 타겟경도 - 0.05 AND 타겟경도 + 0.05
+   ORDER BY distance ASC LIMIT 5;
