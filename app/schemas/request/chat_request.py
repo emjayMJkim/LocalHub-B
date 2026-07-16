@@ -14,4 +14,3 @@ class ChatRequest(BaseModel):
         description="OpenAI API 포맷의 대화 히스토리",
     )
     stream: bool = Field(default=False)
-    response_format: dict[str, Any] | None = Field(default=None)
